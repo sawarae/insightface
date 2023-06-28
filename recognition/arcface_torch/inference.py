@@ -3,9 +3,14 @@ import argparse
 import cv2
 import numpy as np
 import torch
+import glob
+from pathlib import Path 
 
 from backbones import get_model
 
+def calc_cosind_d(id_featureA, id_featureB):
+    cosine_d = np.sum(id_featureA * id_featureB)
+    return cosine_d
 
 @torch.no_grad()
 def inference(weight, name, img):
@@ -23,13 +28,26 @@ def inference(weight, name, img):
     net.load_state_dict(torch.load(weight))
     net.eval()
     feat = net(img).numpy()
-    print(feat)
+    return feat
 
+@torch.no_grad()
+def calc_image_distance(weight, name, img, target_image_path):
+    image_path_list = glob.glob(str(Path(target_image_path) / '*.jpg'))
+    feature = inference(weight, name, img)
+    for img_path in image_path_list:
+        target_feature = inference(weight, name, img_path)
+        distance = calc_cosind_d(feature, target_feature)
+        print(img, img_path, distance)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch ArcFace Training')
     parser.add_argument('--network', type=str, default='r50', help='backbone network')
     parser.add_argument('--weight', type=str, default='')
     parser.add_argument('--img', type=str, default=None)
+    parser.add_argument('--target', type=str, default=None)
     args = parser.parse_args()
-    inference(args.weight, args.network, args.img)
+    if not args.tareget:
+        feature = inference(args.weight, args.network, args.img)
+        print(feature)
+    elif args.target:
+        calc_image_distance(args.weight, args.network, args.img, args.target)
